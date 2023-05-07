@@ -4,12 +4,47 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use glam::{IVec2, UVec2};
+use glam::{IVec2};
+use seq_macro;
+use image::{GrayImage, ImageBuffer, Luma, GenericImage};
+
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
 use winit::platform::web::WindowExtWebSys;
+
+const SPRITE_SIDE:u32 = 8; // Corresponds to sprite_zap
+const TILE_SIDE:u32 = 10;  // Corresponds to sprite_walls
+const SPRITE_Y_ORIGIN:u32 = 0;
+const MONSTER_Y_ORIGIN:u32 = 8;
+const TILE_Y_ORIGIN:u32 = 16;
+
+fn load_sprite_atlas() {
+    seq_macro::seq! { N in 0..8 {
+        const sprite: [&[u8]; 8] = [
+            #(
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_zap", stringify!(N), ".png")),
+            )*
+        ];
+    }};
+    seq_macro::seq! { N in 0..4 {
+        const tile: [&[u8]; 4] = [
+            #(
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_walls", stringify!(N), ".png")),
+            )*
+        ];
+    }};
+
+    let mut canvas = ImageBuffer::from_pixel(64, 32, Luma([0xFFu8])); //GrayImage::new(64, 32);
+
+    for idx in 0..8 {
+        let img:GrayImage = image::load_from_memory(sprite[idx]).unwrap().to_luma8();
+        canvas.copy_from(&img, (idx as u32)*SPRITE_SIDE, SPRITE_Y_ORIGIN).unwrap();
+    }
+
+    canvas.save("sprite_atlas_debug.png").unwrap();
+}
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let init_size = window.inner_size();
@@ -65,6 +100,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         )
         .await
         .expect("Failed to create device");
+
+    load_sprite_atlas();
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
