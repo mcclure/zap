@@ -4,6 +4,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use glam::{IVec2, UVec2};
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -11,7 +12,7 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::WindowExtWebSys;
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let size = window.inner_size();
+    let init_size = window.inner_size();
 
     let instance = wgpu::Instance::default();
 
@@ -102,8 +103,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: swapchain_format,
-        width: size.width,
-        height: size.height,
+        width: init_size.width,
+        height: init_size.height,
         present_mode: wgpu::PresentMode::Fifo,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
@@ -140,6 +141,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 {
+                    // Get viewport within window
+                    // FIXME: Better to let IVec handle this?
+                    let (offset, size) =  {
+                        let size = IVec2::new(config.width.try_into().unwrap(),
+                                              config.height.try_into().unwrap());
+                        let diff = size.y - size.x;
+                        if diff == 0 {
+                            (IVec2::ZERO, size)
+                        } else if diff < 0 {
+                            (IVec2::new(-diff/2, 0), IVec2::new(size.y, size.y))
+                        } else {
+                            (IVec2::new(0, diff/2), IVec2::new(size.x, size.x))
+                        }
+                    };
+
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -152,6 +168,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         })],
                         depth_stencil_attachment: None,
                     });
+                    rpass.set_viewport(offset.x as f32, offset.y as f32, size.x as f32, size.y as f32, 0., 1.);
                     rpass.set_pipeline(&render_pipeline);
                     rpass.draw(0..3, 0..1);
                 }
