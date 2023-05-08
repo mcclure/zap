@@ -17,3 +17,7 @@ cmd.exe /c "set RUSTFLAGS=--cfg=web_sys_unstable_apis & wasm-pack.exe build --ta
 # Web (Deploy)
 
 scp pkg/*.js pkg/*.wasm pkg/*.html pkg/*.css pkg/*.png pkg/*.jpg user@webserver:path/to/www
+
+# Add new images
+
+mogrify -alpha extract -strip -negate *.png

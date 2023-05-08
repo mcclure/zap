@@ -6,8 +6,8 @@ use winit::{
 };
 use glam::{IVec2};
 use seq_macro;
-use image::{GrayImage, ImageBuffer, Luma, GenericImage};
-
+use image::{ImageBuffer, Luma, GenericImage};
+use rand::Rng;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -22,14 +22,14 @@ const TILE_Y_ORIGIN:u32 = 16;
 
 fn load_sprite_atlas() {
     seq_macro::seq! { N in 0..8 {
-        const sprite: [&[u8]; 8] = [
+        const SPRITE: [&[u8]; 8] = [
             #(
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_zap", stringify!(N), ".png")),
             )*
         ];
     }};
     seq_macro::seq! { N in 0..4 {
-        const tile: [&[u8]; 4] = [
+        const TILE: [&[u8]; 4] = [
             #(
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_walls", stringify!(N), ".png")),
             )*
@@ -39,8 +39,27 @@ fn load_sprite_atlas() {
     let mut canvas = ImageBuffer::from_pixel(64, 32, Luma([0xFFu8])); //GrayImage::new(64, 32);
 
     for idx in 0..8 {
-        let img:GrayImage = image::load_from_memory(sprite[idx]).unwrap().to_luma8();
+        let img = image::load_from_memory(SPRITE[idx]).unwrap().to_luma8();
         canvas.copy_from(&img, (idx as u32)*SPRITE_SIDE, SPRITE_Y_ORIGIN).unwrap();
+    }
+
+    let mut rng = rand::thread_rng();
+    for y in 0..6 {
+        for x8 in 0..8 {
+            for col in 1..4 {
+                if col != 0 && col < 4 {
+                    let value = Luma([rng.gen_range(0..=255) as u8]);
+                    let y = MONSTER_Y_ORIGIN+1+y;
+                    canvas.put_pixel(x8*8+col, y, value);
+                    canvas.put_pixel(x8*8+7-col, y, value);
+                }
+            }
+        }
+    }
+
+    for idx in 0..4 {
+        let img = image::load_from_memory(TILE[idx]).unwrap().to_luma8();
+        canvas.copy_from(&img, (idx as u32)*TILE_SIDE, TILE_Y_ORIGIN).unwrap();
     }
 
     canvas.save("sprite_atlas_debug.png").unwrap();
