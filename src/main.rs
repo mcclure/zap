@@ -1,7 +1,8 @@
 mod texture;
 mod constants;
+mod quad;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -15,6 +16,7 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::WindowExtWebSys;
 
 use crate::texture::*;
+use crate::quad::*;
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let init_size = window.inner_size();
@@ -71,9 +73,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .await
         .expect("Failed to create device");
 
-    let sprite_atlas = make_texture(&device, &queue, load_sprite_atlas(), "sprite");
+    // Build scene
+    let (sprite_atlas, sprite_atlas_view) = make_texture(&device, &queue, load_sprite_atlas(), "sprite");
 
     let sampler = make_sampler(&device);
+
+    let (root_vertex_buffer, root_index_buffer, root_vertex_layout) = make_quad_root_buffer(&device);
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -81,9 +86,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
     });
 
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("single bidnd group layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false }, /* FIXME: Is nearest a filter? */
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering), /* Because nearest */
+                count: None,
+            },
+        ]
+    });
+
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: None,
-        bind_group_layouts: &[],
+        label: Some("single pipeline"),
+        bind_group_layouts: &[&bind_group_layout],
         push_constant_ranges: &[],
     });
 
@@ -95,12 +122,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: "vs_main",
-            buffers: &[],
+            entry_point: "vs_quad",
+            buffers: &[root_vertex_layout],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: "fs_main",
+            entry_point: "fs_quad_direct",
             targets: &[Some(swapchain_format.into())],
         }),
         primitive: wgpu::PrimitiveState::default(),
@@ -165,6 +192,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         }
                     };
 
+                    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&sprite_atlas_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&sampler),
+                            },
+                        ],
+                        layout: &bind_group_layout,
+                        label: Some("frame bind group"),
+                    });
+
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -177,8 +219,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         })],
                         depth_stencil_attachment: None,
                     });
+
                     rpass.set_viewport(offset.x as f32, offset.y as f32, size.x as f32, size.y as f32, 0., 1.);
                     rpass.set_pipeline(&render_pipeline);
+                    rpass.set_vertex_buffer(0, root_vertex_buffer.slice(..));
+                    rpass.set_index_buffer(root_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                    rpass.set_bind_group(0, &bind_group, &[0]);
                     rpass.draw(0..3, 0..1);
                 }
 

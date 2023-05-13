@@ -1,1 +1,3 @@
 This is a working directory for an in-progress project. You are granted no rights to it.
+
+This incorporates sample code from the wgpu "hello-triangle" and "cube" samples.
