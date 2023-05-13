@@ -87,7 +87,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("single bidnd group layout"),
+        label: Some("single bind group layout"),
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -105,7 +105,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering), /* Because nearest */
                 count: None,
             },
-        ]
+        ],
     });
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -224,8 +224,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_pipeline(&render_pipeline);
                     rpass.set_vertex_buffer(0, root_vertex_buffer.slice(..));
                     rpass.set_index_buffer(root_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                    rpass.set_bind_group(0, &bind_group, &[0]);
-                    rpass.draw(0..3, 0..1);
+                    rpass.set_bind_group(0, &bind_group, &[]);
+                    rpass.draw_indexed(0..6, 0, 0..1);
                 }
 
                 queue.submit(Some(encoder.finish()));
