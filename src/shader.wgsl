@@ -28,7 +28,7 @@ fn vs_quad(
 fn fs_quad_direct(vertex: VertexOutput) -> @location(0) vec4<f32> {
     let tex = textureSample(gray, gray_sampler, vertex.tex_coord);
     let v = f32(tex.x); //  / 255.0
-    return vec4<f32>(v);
+    return vec4<f32>(tex.rrr, 1.0);
 }
 
 // Draw quad dark green

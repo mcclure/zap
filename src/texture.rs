@@ -15,9 +15,11 @@ const STANDARD_TEXTURE_DESCRIPTOR:wgpu::TextureDescriptor = wgpu::TextureDescrip
 };
 
 pub fn make_texture(device: &wgpu::Device, queue: &wgpu::Queue, img:GrayImage, label:&str) -> (wgpu::Texture, wgpu::TextureView) {
+    let size = wgpu::Extent3d {width:img.width(), height:img.height(), ..STANDARD_TEXTURE_DESCRIPTOR.size};
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         view_formats: &[],
+        size: size,
         ..STANDARD_TEXTURE_DESCRIPTOR
     });
 
@@ -26,10 +28,10 @@ pub fn make_texture(device: &wgpu::Device, queue: &wgpu::Queue, img:GrayImage, l
         &img,
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(1),
-            rows_per_image: None,
+            bytes_per_row: Some(size.width),
+            rows_per_image: Some(size.height), // Unnecessary
         },
-        wgpu::Extent3d::default(), // TODO size from image
+        size, // TODO size from image
     );
 
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());

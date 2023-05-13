@@ -2,7 +2,7 @@ mod texture;
 mod constants;
 mod quad;
 
-use std::{borrow::Cow, num::NonZeroU32};
+use std::borrow::Cow;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
