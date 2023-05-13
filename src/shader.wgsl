@@ -18,7 +18,8 @@ fn vs_quad(
 ) -> VertexOutput {
     var result: VertexOutput;
     result.tex_coord = position;
-    result.position = vec4(position, 0., 1.);
+    let full_position = position*2. - vec2(1.,1.);
+    result.position = vec4(full_position.x, -full_position.y, 0., 1.);
     return result;
 }
 

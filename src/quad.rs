@@ -2,13 +2,13 @@ use std::mem;
 use wgpu::util::DeviceExt;
 
 const SQUARE_VERTEX : [f32;8] = [
-	0., 0.,
-	0., 1.,
-	1., 0.,
-	1., 1.
+    0., 0.,
+    1., 0.,
+    0., 1.,
+    1., 1.
 ];
 
-const SQUARE_INDEX : [u16;6] = [0, 1, 2, 3, 1, 2];
+const SQUARE_INDEX : [u16;6] = [0, 1, 2, 1, 3, 2];
 
 const SQUARE_LAYOUT : wgpu::VertexBufferLayout = wgpu::VertexBufferLayout {
     array_stride: (mem::size_of::<f32>()*2) as wgpu::BufferAddress,
@@ -16,7 +16,7 @@ const SQUARE_LAYOUT : wgpu::VertexBufferLayout = wgpu::VertexBufferLayout {
     attributes: &[
         wgpu::VertexAttribute {
             format: wgpu::VertexFormat::Float32x2,
-            offset: 4 * 4,
+            offset: 0,
             shader_location: 0,
         },
     ],
