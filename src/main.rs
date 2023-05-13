@@ -76,8 +76,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // Build scene
     let (sprite_atlas, sprite_atlas_view) = make_texture(&device, &queue, load_sprite_atlas(), "sprite");
 
-    let sampler = make_sampler(&device);
-
     let (root_vertex_buffer, root_index_buffer, root_vertex_layout) = make_quad_root_buffer(&device);
 
     // Load the shaders from disk
@@ -97,12 +95,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     view_dimension: wgpu::TextureViewDimension::D2,
                     multisampled: false,
                 },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering), /* Because nearest */
                 count: None,
             },
         ],
@@ -202,11 +194,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             wgpu::BindGroupEntry {
                                 binding: 0,
                                 resource: wgpu::BindingResource::TextureView(&sprite_atlas_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&sampler),
-                            },
+                            }
                         ],
                         layout: &bind_group_layout,
                         label: Some("frame bind group"),

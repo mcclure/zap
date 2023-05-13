@@ -7,10 +7,6 @@ struct VertexOutput {
 @binding(0)
 var gray: texture_2d<f32>;
 
-@group(0)
-@binding(1)
-var gray_sampler: sampler;
-
 // Quad positioning
 @vertex
 fn vs_quad(
@@ -26,7 +22,8 @@ fn vs_quad(
 // Draw quad unaltered (for debug?)
 @fragment
 fn fs_quad_direct(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let tex = textureSample(gray, gray_sampler, vertex.tex_coord);
+    let dim = textureDimensions(gray);
+    let tex = textureLoad(gray, vec2<u32>(vertex.tex_coord*vec2<f32>(dim)), 0);
     let v = f32(tex.x); //  / 255.0
     return vec4<f32>(tex.rrr, 1.0);
 }
