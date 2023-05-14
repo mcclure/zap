@@ -2,7 +2,7 @@
 
 use crate::constants::*;
 use seq_macro;
-use image::{GenericImage, GrayImage, ImageBuffer, Luma};
+use image::{GenericImage, GrayImage, ImageBuffer, Luma, imageops::{rotate90_in, rotate180_in, rotate270_in}};
 use rand::Rng;
 
 const STANDARD_TEXTURE_DESCRIPTOR:wgpu::TextureDescriptor = wgpu::TextureDescriptor {
@@ -47,7 +47,7 @@ pub fn make_sampler(device: &wgpu::Device) -> wgpu::Sampler { // Expected only c
 
 pub fn load_sprite_atlas() -> GrayImage {
     seq_macro::seq! { N in 0..8 {
-        const SPRITE: [&[u8]; 8] = [
+        const ACTOR: [&[u8]; 8] = [
             #(
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_zap", stringify!(N), ".png")),
             )*
@@ -59,13 +59,19 @@ pub fn load_sprite_atlas() -> GrayImage {
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_walls", stringify!(N), ".png")),
             )*
         ];
+
+        let tile_img:[GrayImage;4] = [
+            #(
+                image::load_from_memory(TILE[N]).unwrap().to_luma8(),
+            )*
+        ];
     }};
 
-    let mut canvas = ImageBuffer::from_pixel(64, 32, Luma([0xFFu8])); //GrayImage::new(64, 32);
+    let mut canvas = ImageBuffer::from_pixel(128, 32, Luma([0xFFu8])); //GrayImage::new(64, 32);
 
     for idx in 0..8 {
-        let img = image::load_from_memory(SPRITE[idx]).unwrap().to_luma8();
-        canvas.copy_from(&img, (idx as u32)*SPRITE_SIDE, SPRITE_Y_ORIGIN).unwrap();
+        let img = image::load_from_memory(ACTOR[idx]).unwrap().to_luma8();
+        canvas.copy_from(&img, (idx as u32)*ACTOR_SIDE, ACTOR_Y_ORIGIN).unwrap();
     }
 
     let mut rng = rand::thread_rng();
@@ -74,17 +80,35 @@ pub fn load_sprite_atlas() -> GrayImage {
             for col in 1..4 {
                 if col != 0 && col < 4 {
                     let value = Luma([rng.gen_range(0..=255) as u8]);
+                    let x = MONSTER_X_ORIGIN+x8*8;
                     let y = MONSTER_Y_ORIGIN+1+y;
-                    canvas.put_pixel(x8*8+col, y, value);
-                    canvas.put_pixel(x8*8+7-col, y, value);
+                    canvas.put_pixel(x+col, y, value);
+                    canvas.put_pixel(x+7-col, y, value);
                 }
             }
         }
     }
 
-    for idx in 0..4 {
-        let img = image::load_from_memory(TILE[idx]).unwrap().to_luma8();
-        canvas.copy_from(&img, (idx as u32)*TILE_SIDE, TILE_Y_ORIGIN).unwrap();
+    {
+        let mut temp = GrayImage::new(TILE_SIDE, TILE_SIDE);
+        for idx in 0..WallRot::Blank as usize {
+            let sem = WALL_ROT_SEMANTICS[idx];
+            let img:&GrayImage;
+            let target = &tile_img[sem[0] as usize];
+            if sem[1] == 0 {
+                img = &target;
+            } else {
+                match sem[1] {
+                    1 => rotate90_in(target, &mut temp),
+                    2 => rotate180_in(target, &mut temp),
+                    3 => rotate270_in(target, &mut temp),
+                    _ => unreachable!()
+                }.unwrap();
+                img = &temp;
+            }
+            let idx32 = idx as u32;
+            canvas.copy_from(img, idx32*TILE_SIDE, TILE_Y_ORIGIN).unwrap();
+        }
     }
 
     //canvas.save("sprite_atlas_debug.png").unwrap(); // Debug

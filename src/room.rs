@@ -3,13 +3,13 @@
 use crate::constants::*;
 
 use rand::Rng;
-use std::mem;
+//use std::mem;
 use glam::{IVec2, Vec2};
 use divrem::DivCeil;
 
-fn make_float(v:IVec2, offset:i32, scale:Vec2) -> [f32;2] {
+fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
 	(
-		Vec2::new((v.x - offset) as f32, (v.y - offset) as f32)
+		Vec2::new(v.x as f32, v.y as f32)
 		/ scale
 	).to_array()
 }
@@ -23,16 +23,16 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 	let (pos_scale, tex_scale) = (pos_scale.as_vec2(), tex_scale.as_vec2());
 
 	// Make position, make tile
-	let mp = |v:IVec2| { make_float(v, OFFSET, pos_scale) };
-	let mt = |v:IVec2| { make_float(v, 0, tex_scale) };
+	let mp = |v:IVec2| { make_float(v, pos_scale) };
+	let mt = |v:IVec2| { make_float(v, tex_scale) };
 
 	let mut storage:Vec<u8> = Vec::default(); 
 
 	'grid: for y in 0..tiles {
 		for x in 0..tiles {
-			let tile_which = rng.gen_range(0..MONSTER_COUNT);
+			let tile_which = rng.gen_range(0..WallRot::Blank as u32);
 			let sprite = [
-				mp(IVec2::new((x*TILE_SIDE) as i32, (y*TILE_SIDE) as i32)),
+				mp(IVec2::new((x*TILE_SIDE) as i32 - OFFSET, (y*TILE_SIDE) as i32 - OFFSET)),
 				mp(TILE_SIZE),
 				mt(IVec2::new((tile_which*TILE_SIDE) as i32, TILE_Y_ORIGIN as i32)),
 				mt(TILE_SIZE)
