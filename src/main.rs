@@ -18,6 +18,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
 use winit::platform::web::WindowExtWebSys;
 
+use crate::constants::*;
 use crate::quad::*;
 use crate::room::*;
 use crate::texture::*;
@@ -87,15 +88,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let (root_vertex_buffer, root_index_buffer, root_vertex_layout) = make_quad_root_buffer(&device);
 
-    let instance_buffer = make_quad_instance_buffer(&device, "0"); // Returns mapped
+    let (instance_buffer, instance_layout) = make_quad_instance_buffer(&device, "0"); // Returns mapped
 
     // Write scene
-    let instance_buffer_size = room_push_fill_random(
+    let instance_buffer_count = room_push_fill_random(
         &queue,
         &instance_buffer,
+        IVec2::new(CANVAS_SIDE as i32, CANVAS_SIDE as i32),
         extent_xy_to_ivec(sprite_atlas.size())
     );
-    instance_buffer.unmap();
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -134,7 +135,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_quad",
-            buffers: &[root_vertex_layout],
+            buffers: &[root_vertex_layout, instance_layout],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -235,9 +236,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_viewport(offset.x as f32, offset.y as f32, size.x as f32, size.y as f32, 0., 1.);
                     rpass.set_pipeline(&render_pipeline);
                     rpass.set_vertex_buffer(0, root_vertex_buffer.slice(..));
+                    rpass.set_vertex_buffer(1, instance_buffer.slice(..));
                     rpass.set_index_buffer(root_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     rpass.set_bind_group(0, &bind_group, &[]);
-                    rpass.draw_indexed(0..6, 0, 0..1);
+                    rpass.draw_indexed(0..6, 0, 0..(instance_buffer_count as u32));
                 }
 
                 queue.submit(Some(encoder.finish()));

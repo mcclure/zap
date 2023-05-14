@@ -26,7 +26,7 @@ const SQUARE_LAYOUT : wgpu::VertexBufferLayout = wgpu::VertexBufferLayout {
     ],
 };
 
-pub fn make_quad_root_buffer(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, wgpu::VertexBufferLayout) {
+pub fn make_quad_root_buffer(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, wgpu::VertexBufferLayout<'static>) {
 	let root_vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Unified vertex buffer"),
         contents: bytemuck::cast_slice(&SQUARE_VERTEX),
@@ -42,14 +42,41 @@ pub fn make_quad_root_buffer(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buff
     (root_vertex, root_index, SQUARE_LAYOUT)
 }
 
+const QUAD_INSTANCE_LAYOUT : wgpu::VertexBufferLayout = wgpu::VertexBufferLayout {
+    array_stride: (mem::size_of::<f32>()*8) as wgpu::BufferAddress,
+    step_mode: wgpu::VertexStepMode::Instance,
+    attributes: &[
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x2,
+            offset: 0,
+            shader_location: 1,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x2,
+            offset: 2*mem::size_of::<f32>() as u64,
+            shader_location: 2,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x2,
+            offset: 4*mem::size_of::<f32>() as u64,
+            shader_location: 3,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x2,
+            offset: 6*mem::size_of::<f32>() as u64,
+            shader_location: 4,
+        },
+    ],
+};
+
 // Makes some assumptions about usage
-pub fn make_quad_instance_buffer(device:&wgpu::Device, tag:&str) -> wgpu::Buffer {
+pub fn make_quad_instance_buffer(device:&wgpu::Device, tag:&str) -> (wgpu::Buffer, wgpu::VertexBufferLayout<'static>) {
     let instance = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(&format!("Instance buffer {}", tag)),
-        size: (SPRITE_SIZE*(SPRITES_MAX as usize)) as u64,
+        size: SPRITE_SIZE*SPRITES_MAX,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation:true
+        mapped_at_creation:false
     });
 
-    instance
+    (instance, QUAD_INSTANCE_LAYOUT)
 }
