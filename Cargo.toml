@@ -13,6 +13,7 @@ glam = "0.24.0"
 image = { version = "0.24.6", features = ["png"] }
 int-enum = "0.5.0"
 log = "0.4.17"
+ndarray = "0.15.6"
 pollster = "0.3.0"
 rand = "0.8.5"
 seq-macro = "0.3.3"
