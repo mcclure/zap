@@ -47,7 +47,7 @@ pub fn make_quad_instance_buffer(device:&wgpu::Device, tag:&str) -> wgpu::Buffer
     let instance = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(&format!("Instance buffer {}", tag)),
         size: (SPRITE_SIZE*(SPRITES_MAX as usize)) as u64,
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::MAP_WRITE,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation:true
     });
 

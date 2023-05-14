@@ -91,7 +91,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // Write scene
     let instance_buffer_size = room_push_fill_random(
-        &mut instance_buffer.slice(..).get_mapped_range_mut(),
+        &queue,
+        &instance_buffer,
         extent_xy_to_ivec(sprite_atlas.size())
     );
     instance_buffer.unmap();
