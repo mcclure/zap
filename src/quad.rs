@@ -1,5 +1,9 @@
+// Basic routines for working with textured quads
+
 use std::mem;
 use wgpu::util::DeviceExt;
+
+use crate::constants::*;
 
 const SQUARE_VERTEX : [f32;8] = [
     0., 0.,
@@ -26,14 +30,26 @@ pub fn make_quad_root_buffer(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buff
 	let root_vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Unified vertex buffer"),
         contents: bytemuck::cast_slice(&SQUARE_VERTEX),
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        usage: wgpu::BufferUsages::VERTEX, // Immutable
     });
 
     let root_index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Unified index buffer"),
         contents: bytemuck::cast_slice(&SQUARE_INDEX),
-        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        usage: wgpu::BufferUsages::INDEX, // Immutable
     });
 
     (root_vertex, root_index, SQUARE_LAYOUT)
+}
+
+// Makes some assumptions about usage
+pub fn make_quad_instance_buffer(device:&wgpu::Device, tag:&str) -> wgpu::Buffer {
+    let instance = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some(&format!("Instance buffer {}", tag)),
+        size: (SPRITE_SIZE*(SPRITES_MAX as usize)) as u64,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::MAP_WRITE,
+        mapped_at_creation:true
+    });
+
+    instance
 }

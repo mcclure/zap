@@ -1,6 +1,9 @@
-mod texture;
+// Entry point
+
 mod constants;
 mod quad;
+mod room;
+mod texture;
 
 use std::borrow::Cow;
 use winit::{
@@ -15,8 +18,14 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
 use winit::platform::web::WindowExtWebSys;
 
-use crate::texture::*;
 use crate::quad::*;
+use crate::room::*;
+use crate::texture::*;
+
+// Silently fails if texture is bigger than 2^31 on either axis. Whatever
+fn extent_xy_to_ivec(v:wgpu::Extent3d) -> IVec2 {
+    IVec2::new(v.width as i32, v.height as i32)
+}
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let init_size = window.inner_size();
@@ -77,6 +86,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (sprite_atlas, sprite_atlas_view) = make_texture(&device, &queue, load_sprite_atlas(), "sprite");
 
     let (root_vertex_buffer, root_index_buffer, root_vertex_layout) = make_quad_root_buffer(&device);
+
+    let instance_buffer = make_quad_instance_buffer(&device, "0"); // Returns mapped
+
+    // Write scene
+    let instance_buffer_size = room_push_fill_random(
+        &mut instance_buffer.slice(..).get_mapped_range_mut(),
+        extent_xy_to_ivec(sprite_atlas.size())
+    );
+    instance_buffer.unmap();
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {

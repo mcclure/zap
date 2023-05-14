@@ -1,3 +1,5 @@
+// Basic routines for working with textured quads
+
 use crate::constants::*;
 use seq_macro;
 use image::{GenericImage, GrayImage, ImageBuffer, Luma};
@@ -68,7 +70,7 @@ pub fn load_sprite_atlas() -> GrayImage {
 
     let mut rng = rand::thread_rng();
     for y in 0..6 {
-        for x8 in 0..8 {
+        for x8 in 0..MONSTER_COUNT {
             for col in 1..4 {
                 if col != 0 && col < 4 {
                     let value = Luma([rng.gen_range(0..=255) as u8]);
