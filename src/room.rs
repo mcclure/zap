@@ -29,32 +29,34 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 			IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
 		}
 
-		const COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0), IVec2::new(0,-1)];
+		// Must randomize indices rather than directions because rotation identity matters
+		const COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0) , IVec2::new(0,-1)];
+		const COMPASS_IDX:[usize;4] = [2,1,0,3];
 		
-		let mut next = vec![routes_bound/2];
-		while next.len() > 0 {
-			let mut current = std::mem::take(&mut next);
-			current.shuffle(&mut rng);
+		let mut stack = vec![(routes_bound/2, COMPASS_IDX, 0)];
+		loop {
+			let top = stack.pop();
+			if top == None { break }
+			let (at, compass_order, compass_order_idx) = top.unwrap();
 
-			for at in current {
-				let mut at_value = 0;
-				let mut random_compass = COMPASS.clone();
-				random_compass.shuffle(&mut rng);
+			if compass_order_idx < 3 {
+				stack.push((at, compass_order, compass_order_idx+1));
+			}
 
-				for (idx,&dir) in random_compass.iter().enumerate() {
-					let cand = at + dir;
-					if within(cand, routes_bound) {
-						let cand_value = routes[to_index(cand)];
-						let is_free = cand_value == 0;
-						if is_free {
-							next.push(cand);
-						}
-						if is_free || 0 != cand_value & 1<<((idx+2)%4) {
-							at_value |= 1<<idx;
-						}
-					}
+			let compass_idx = compass_order[compass_order_idx];
+			let cand = at + COMPASS[compass_idx];
+
+			if within(cand, routes_bound) {
+				let cand_value = routes[to_index(cand)];
+				let is_free = cand_value == 0;
+				if is_free {
+					let mut random_compass = COMPASS_IDX.clone();
+					random_compass.shuffle(&mut rng);
+					stack.push((cand, random_compass, 0));
 				}
-				routes[to_index(at)] = at_value;
+				if is_free || 0 != cand_value & 1<<((compass_idx+2)%4) {
+					routes[to_index(at)] |= 1<<compass_idx; // Reciprocate
+				}
 			}
 		}
 	}
