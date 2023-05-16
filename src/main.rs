@@ -25,6 +25,8 @@ use crate::texture::*;
 
 const FORCE_MULTIPLE: Option<i32> = Some(128);
 
+const CLEAR_COLOR: wgpu::Color = wgpu::Color { r:250./255., g:236./255., b:209./255., a:1. };
+
 // Silently fails if texture is bigger than 2^31 on either axis. Whatever
 fn extent_xy_to_ivec(v:wgpu::Extent3d) -> IVec2 {
     IVec2::new(v.width as i32, v.height as i32)
@@ -243,7 +245,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                                load: wgpu::LoadOp::Clear(CLEAR_COLOR),
                                 store: true,
                             },
                         })],
