@@ -21,6 +21,24 @@ pub const SPRITES_MAX:u64 = 512; // 13*13*2 = 338, round up for room for bullets
 
 // Walls
 
+#[repr(usize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum)]
+pub enum Dir {
+	Right = 0,
+	Down = 1,
+	Left = 2,
+	Up = 3
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum)]
+pub enum DirMask {
+	Right = 1,
+	Down = 2,
+	Left = 4,
+	Up = 8
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum)]
 pub enum WallRot {

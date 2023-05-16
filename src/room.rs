@@ -2,11 +2,10 @@
 
 use crate::constants::*;
 
-use rand::Rng;
 //use std::mem;
 use glam::{IVec2, Vec2};
 use divrem::DivCeil;
-use ndarray::Array2;
+use ndarray::{Array2, Axis};
 use rand::seq::SliceRandom;
 
 fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
@@ -17,13 +16,13 @@ fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
 }
 
 fn _debug_room(routes: &Array2<u8>, origin:IVec2, player:IVec2, dir:usize) {
-	use ndarray::Axis;
 	for (y,col) in routes.axis_iter(Axis(0)).enumerate() {
-		for (x,tile_which) in col.iter().enumerate() {
-			print!("{}{}{}{}{} ", if tile_which&8!=0 {'U'} else {'_'}, if tile_which&4!=0 {'L'} else {'_'}, 
-				if tile_which&2!=0 {'D'} else {'_'}, if tile_which&1!=0 {'R'} else {'_'},
+		for (x,tile_mask) in col.iter().enumerate() {
+			const R:usize = Dir::Right as usize; const D:usize = Dir::Down as usize; const L:usize = Dir::Left as usize; const U:usize = Dir::Up as usize;
+			print!("{}{}{}{}{} ", if tile_mask&DirMask::Up as u8!=0 {'U'} else {'_'}, if tile_mask&DirMask::Left as u8!=0 {'L'} else {'_'}, 
+				if tile_mask&DirMask::Down as u8!=0 {'D'} else {'_'}, if tile_mask&DirMask::Right as u8!=0 {'R'} else {'_'},
 				if player.x==x as i32 && player.y==y as i32 {match dir {
-					0 => '>', 1 => 'v', 2 => '<', 3 => '^', _ => '?'
+					R => '>', D => 'v', L => '<', U => '^', _ => '?'
 				}} else
 				if origin.x==x as i32 && origin.y==y as i32 {'*'} else {' '});
 		}
@@ -32,18 +31,19 @@ fn _debug_room(routes: &Array2<u8>, origin:IVec2, player:IVec2, dir:usize) {
 }
 
 pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2) -> u64 {
-	let tiles:u32 = CANVAS_SIDE.div_ceil(TILE_SIDE);
+	const TILES:u32 = CANVAS_SIDE/TILE_SIDE - 1;
+
+	// NDArray helpers
+	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
+	fn within (at:IVec2, size:IVec2) -> bool {
+		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
+	}
 
 	// Make map
-	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
-	let routes_bound = IVec2::new(tiles as i32, tiles as i32);
+	let routes_bound = IVec2::new(TILES as i32, TILES as i32);
 	let mut routes:Array2<u8> = Array2::default(to_index(routes_bound));
 	let mut rng = rand::thread_rng();
 	{
-		fn within (at:IVec2, size:IVec2) -> bool {
-			IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
-		}
-
 		// Must randomize indices rather than directions because rotation identity matters
 		const COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0) , IVec2::new(0,-1)];
 		const COMPASS_IDX:[usize;4] = [2,1,0,3];
@@ -77,7 +77,37 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 		}
 	}
 
-	const OFFSET:i32 = (TILE_SIDE as i32 - (CANVAS_SIDE%TILE_SIDE) as i32)/2;
+	let walls_bound = routes_bound + IVec2::ONE;
+	let mut walls:Array2<u8> = Array2::default(to_index(walls_bound));
+	// Instead of iterating over the members of the array imagine the grid separating members of the array,
+	// and imagine iterating over the intersection points.
+	for y in 0..(TILES+1) {
+		for x in 0..(TILES+1) {
+			let at = (y as usize, x as usize);
+			let up_left = IVec2::new(x as i32-1,y as i32-1);
+			let down_left = IVec2::new(x as i32-1,y as i32);
+
+			if !within(up_left, routes_bound) || 0==routes[to_index(up_left)]&DirMask::Right as u8
+				{ walls[at] |= DirMask::Up as u8 }
+			if !within(down_left, routes_bound) || 0==routes[to_index(down_left)]&DirMask::Right as u8
+				{ walls[at] |= DirMask::Down as u8 }
+		}
+	}
+	for y in 0..(TILES+1) {
+		for x in 0..(TILES+1) {
+			let at = (y as usize, x as usize);
+			let up_left = IVec2::new(x as i32-1,y as i32-1);
+			let up_right = IVec2::new(x as i32,y as i32-1);
+
+			if !within(up_left, routes_bound) || 0==routes[to_index(up_left)]&DirMask::Down as u8
+				{ walls[at] |= DirMask::Left as u8 }
+			if !within(up_right, routes_bound) || 0==routes[to_index(up_right)]&DirMask::Down as u8
+				{ walls[at] |= DirMask::Right as u8 }
+		}
+	}
+
+	// Notice y,x order
+	const OFFSET:i32 = (CANVAS_SIDE as i32 - TILE_SIDE as i32*(TILES as i32 + 1))/2;
 	const TILE_SIZE:IVec2 = IVec2::new(TILE_SIDE as i32, TILE_SIDE as i32);
 
 	let (pos_scale, tex_scale) = (pos_scale.as_vec2(), tex_scale.as_vec2());
@@ -88,11 +118,11 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 
 	let mut storage:Vec<u8> = Vec::default(); 
 
-	'grid: for y in 0..tiles {
-		for x in 0..tiles {
-			let tile_which = WALL_ROT_MASK[routes[(y as usize,x as usize)] as usize] as u32;
+	'grid: for (y,col) in walls.axis_iter(Axis(0)).enumerate() {
+		for (x,&tile_mask) in col.iter().enumerate() {
+			let tile_which = WALL_ROT_MASK[tile_mask as usize] as u32; // Notice y,x order
 			let sprite = [
-				mp(IVec2::new((x*TILE_SIDE) as i32 - OFFSET, (y*TILE_SIDE) as i32 - OFFSET)),
+				mp(IVec2::new((x as u32*TILE_SIDE) as i32 + OFFSET, (y as u32*TILE_SIDE) as i32 + OFFSET)),
 				mp(TILE_SIZE),
 				mt(IVec2::new((tile_which*TILE_SIDE) as i32, TILE_Y_ORIGIN as i32)),
 				mt(TILE_SIZE)
