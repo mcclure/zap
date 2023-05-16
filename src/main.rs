@@ -249,7 +249,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
+/*
+            // Uncomment for RenderDoc.
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {..},
+                ..
+            } => window.request_redraw(),
             _ => {}
+*/
         }
     });
 }

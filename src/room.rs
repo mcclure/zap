@@ -4,7 +4,6 @@ use crate::constants::*;
 
 //use std::mem;
 use glam::{IVec2, Vec2};
-use divrem::DivCeil;
 use ndarray::{Array2, Axis};
 use rand::seq::SliceRandom;
 

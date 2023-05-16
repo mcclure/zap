@@ -21,3 +21,4 @@ scp pkg/*.js pkg/*.wasm pkg/*.html pkg/*.css pkg/*.png pkg/*.jpg user@webserver:
 # Add new images
 
 mogrify -alpha extract -strip -negate *.png
+convert sprite_walls2_adjust.png -channel R -separate -strip sprite_walls2.png
