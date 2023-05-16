@@ -16,6 +16,21 @@ fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
 	).to_array()
 }
 
+fn _debug_room(routes: &Array2<u8>, origin:IVec2, player:IVec2, dir:usize) {
+	use ndarray::Axis;
+	for (y,col) in routes.axis_iter(Axis(0)).enumerate() {
+		for (x,tile_which) in col.iter().enumerate() {
+			print!("{}{}{}{}{} ", if tile_which&8!=0 {'U'} else {'_'}, if tile_which&4!=0 {'L'} else {'_'}, 
+				if tile_which&2!=0 {'D'} else {'_'}, if tile_which&1!=0 {'R'} else {'_'},
+				if player.x==x as i32 && player.y==y as i32 {match dir {
+					0 => '>', 1 => 'v', 2 => '<', 3 => '^', _ => '?'
+				}} else
+				if origin.x==x as i32 && origin.y==y as i32 {'*'} else {' '});
+		}
+		println!("");
+	}
+}
+
 pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2) -> u64 {
 	let tiles:u32 = CANVAS_SIDE.div_ceil(TILE_SIDE);
 
@@ -54,6 +69,7 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 					random_compass.shuffle(&mut rng);
 					stack.push((cand, random_compass, 0));
 				}
+//println!("\nFrom {} check {}: {}, {}", at, cand, is_free, 0 != cand_value & 1<<((compass_idx+2)%4)); _debug_room(&routes, routes_bound/2, at, compass_idx);
 				if is_free || 0 != cand_value & 1<<((compass_idx+2)%4) {
 					routes[to_index(at)] |= 1<<compass_idx; // Reciprocate
 				}
@@ -74,7 +90,7 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 
 	'grid: for y in 0..tiles {
 		for x in 0..tiles {
-			let tile_which = WALL_ROT_MASK[routes[(x as usize,y as usize)] as usize] as u32;
+			let tile_which = WALL_ROT_MASK[routes[(y as usize,x as usize)] as usize] as u32;
 			let sprite = [
 				mp(IVec2::new((x*TILE_SIDE) as i32 - OFFSET, (y*TILE_SIDE) as i32 - OFFSET)),
 				mp(TILE_SIZE),

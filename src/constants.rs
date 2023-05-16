@@ -66,11 +66,11 @@ pub const WALL_ROT_MASK:[WallRot;16] = [
 	WallRot::L1,        // 0110
 	WallRot::T0,        // 0111
 	WallRot::UpDown,    // 1000 -- INVALID
-	WallRot::L2,        // 1001
+	WallRot::L3,        // 1001
 	WallRot::UpDown,    // 1010
-	WallRot::T1,        // 1011
-	WallRot::L3,        // 1100
+	WallRot::T3,        // 1011
+	WallRot::L2,        // 1100
 	WallRot::T2,        // 1101
-	WallRot::T3,        // 1110
+	WallRot::T1,        // 1110
 	WallRot::Full,      // 1111
 ];

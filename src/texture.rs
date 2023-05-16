@@ -95,10 +95,11 @@ pub fn load_sprite_atlas() -> GrayImage {
             let sem = WALL_ROT_SEMANTICS[idx];
             let img:&GrayImage;
             let target = &tile_img[sem[0] as usize];
-            if sem[1] == 0 {
+            let rot = sem[1];
+            if rot == 0 {
                 img = &target;
             } else {
-                match sem[1] {
+                match rot {
                     1 => rotate90_in(target, &mut temp),
                     2 => rotate180_in(target, &mut temp),
                     3 => rotate270_in(target, &mut temp),
