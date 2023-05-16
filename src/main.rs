@@ -23,6 +23,8 @@ use crate::quad::*;
 use crate::room::*;
 use crate::texture::*;
 
+const FORCE_MULTIPLE: Option<i32> = Some(128);
+
 // Silently fails if texture is bigger than 2^31 on either axis. Whatever
 fn extent_xy_to_ivec(v:wgpu::Extent3d) -> IVec2 {
     IVec2::new(v.width as i32, v.height as i32)
@@ -197,15 +199,30 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     // Get viewport within window
                     // FIXME: Better to let IVec handle this?
                     let (offset, size) =  {
-                        let size = IVec2::new(config.width.try_into().unwrap(),
-                                              config.height.try_into().unwrap());
-                        let diff = size.y - size.x;
-                        if diff == 0 {
-                            (IVec2::ZERO, size)
-                        } else if diff < 0 {
-                            (IVec2::new(-diff/2, 0), IVec2::new(size.y, size.y))
+                        let (offset, size) =  {
+                            let size = IVec2::new(config.width.try_into().unwrap(),
+                                                  config.height.try_into().unwrap());
+                            let diff = size.y - size.x;
+                            if diff == 0 {
+                                (IVec2::ZERO, size)
+                            } else if diff < 0 {
+                                (IVec2::new(-diff/2, 0), IVec2::new(size.y, size.y))
+                            } else {
+                                (IVec2::new(0, diff/2), IVec2::new(size.x, size.x))
+                            }
+                        };
+
+                        if let Some(radix) = FORCE_MULTIPLE { // Assumes made square in previous step
+                            if size.x > radix {
+                                let reduce_by = size.x % radix;
+                                let reduced_side = size.x - reduce_by;
+
+                                (offset + reduce_by/2, IVec2::new(reduced_side, reduced_side))
+                            } else {
+                                (offset, size)
+                            }
                         } else {
-                            (IVec2::new(0, diff/2), IVec2::new(size.x, size.x))
+                            (offset, size)
                         }
                     };
 
@@ -255,8 +272,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::KeyboardInput {..},
                 ..
             } => window.request_redraw(),
-            _ => {}
 */
+            _ => {}
         }
     });
 }
