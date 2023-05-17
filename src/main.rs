@@ -7,7 +7,7 @@ mod texture;
 
 use std::borrow::Cow;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, WindowEvent, ElementState, KeyboardInput},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
@@ -95,13 +95,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (instance_buffer, instance_layout) = make_quad_instance_buffer(&device, "0"); // Returns mapped
 
     // Write scene
-    let instance_buffer_count = room_push_fill_random(
-        &queue,
-        &instance_buffer,
-        IVec2::new(CANVAS_SIDE as i32, CANVAS_SIDE as i32),
-        extent_xy_to_ivec(sprite_atlas.size()),
-        true
-    );
+    let mut instance_buffer_count;
+    fn reset_instance_buffer(queue:&wgpu::Queue, instance_buffer:&wgpu::Buffer, sprite_atlas:&wgpu::Texture) -> u64 {
+        return room_push_fill_random(
+            queue,
+            instance_buffer,
+            IVec2::new(CANVAS_SIDE as i32, CANVAS_SIDE as i32),
+            extent_xy_to_ivec(sprite_atlas.size()),
+            true
+       );
+    }
+    instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -269,13 +273,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
-/*
-            // Uncomment for RenderDoc.
+            // Recomment when a more sensible frame approach in place, but then uncomment again for RenderDoc.
             Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {..},
+                event: WindowEvent::KeyboardInput {input: KeyboardInput{state: ElementState::Pressed, ..}, ..},
                 ..
-            } => window.request_redraw(),
-*/
+            } =>  {
+                instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
+                window.request_redraw()
+            },
             _ => {}
         }
     });
