@@ -53,14 +53,14 @@ pub fn load_sprite_atlas() -> GrayImage {
             )*
         ];
     }};
-    seq_macro::seq! { N in 0..4 {
-        const TILE: [&[u8]; 4] = [
+    seq_macro::seq! { N in 0..5 {
+        const TILE: [&[u8]; 5] = [
             #(
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/sprite_walls", stringify!(N), ".png")),
             )*
         ];
 
-        let tile_img:[GrayImage;4] = [
+        let tile_img:[GrayImage;5] = [
             #(
                 image::load_from_memory(TILE[N]).unwrap().to_luma8(),
             )*
@@ -91,7 +91,7 @@ pub fn load_sprite_atlas() -> GrayImage {
 
     {
         let mut temp = GrayImage::new(TILE_SIDE, TILE_SIDE);
-        for idx in 0..WallRot::Blank as usize {
+        for idx in WallRot::Right as usize..WallRot::Count as usize {
             let sem = WALL_ROT_SEMANTICS[idx];
             let img:&GrayImage;
             let target = &tile_img[sem[0] as usize];
@@ -108,11 +108,11 @@ pub fn load_sprite_atlas() -> GrayImage {
                 img = &temp;
             }
             let idx32 = idx as u32;
-            canvas.copy_from(img, idx32*TILE_SIDE, TILE_Y_ORIGIN).unwrap();
+            canvas.copy_from(img, (idx32%TILE_ROW_MAX)*TILE_SIDE, TILE_Y_ORIGIN+(idx32/TILE_ROW_MAX)*TILE_SIDE).unwrap();
         }
     }
 
-    //canvas.save("sprite_atlas_debug.png").unwrap(); // Debug
+    canvas.save("sprite_atlas_debug.png").unwrap(); // Debug
 
     canvas
 }

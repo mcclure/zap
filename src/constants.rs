@@ -7,7 +7,7 @@ use int_enum::IntEnum;
 
 pub const ACTOR_SIDE:u32 = 8; // Corresponds to sprite_zap
 pub const TILE_SIDE:u32 = 10;  // Corresponds to sprite_walls
-pub const TILE_ROW_MAX:u32 = 6;
+pub const TILE_ROW_MAX:u32 = 8;
 pub const ACTOR_Y_ORIGIN:u32 = 0;
 pub const MONSTER_X_ORIGIN:u32 = 64;
 pub const MONSTER_Y_ORIGIN:u32 = 0;
@@ -39,56 +39,46 @@ pub enum DirMask {
 	Up = 8
 }
 
+// From lowest to highest signficance, walls go RIGHT DOWN LEFT UP
+// L0 is right+down; T0 is right+down+left; each rotates90deg
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum)]
 pub enum WallRot {
-    Full = 0,
-    T0 = 1,
-    T1 = 2,
-    T2 = 3,
-    T3 = 4,
-    L0 = 5,
-    L1 = 6,
-    L2 = 7,
-    L3 = 8,
-    LeftRight = 9,
-    UpDown    = 10,
-    Blank     = 11,
-    Count     = 12
+	Blank     = 0b0000,
+	Right     = 0b0001,
+	Down      = 0b0010,
+	L0        = 0b0011,
+	Left      = 0b0100,
+	LeftRight = 0b0101,
+	L1        = 0b0110,
+	T0        = 0b0111,
+	Up        = 0b1000,
+	L3        = 0b1001,
+	UpDown    = 0b1010,
+	T3        = 0b1011,
+	L2        = 0b1100,
+	T2        = 0b1101,
+	T1        = 0b1110,
+	Full      = 0b1111,
+    Count = 16
 }
 
 // Map WallRot to [sprite_walls%d.png, rotations]
-pub const WALL_ROT_SEMANTICS:[[u8;2];WallRot::Blank as usize] = [
-	[0, 0],
-	[3, 0],
-	[3, 1],
-	[3, 2],
-	[3, 3],
-	[2, 0],
-	[2, 1],
-	[2, 2],
-	[2, 3],
-	[1, 0],
-	[1, 1],
-];
-
-// From lowest to highest signficance, walls go RIGHT DOWN LEFT UP
-// L0 is right+down; T0 is right+down+left; each rotates90deg
-pub const WALL_ROT_MASK:[WallRot;16] = [
-	WallRot::Blank,     // 0000
-	WallRot::LeftRight, // 0001 -- INVALID
-	WallRot::UpDown,    // 0010 -- INVALID
-	WallRot::L0,        // 0011
-	WallRot::LeftRight, // 0100 -- INVALID
-	WallRot::LeftRight, // 0101
-	WallRot::L1,        // 0110
-	WallRot::T0,        // 0111
-	WallRot::UpDown,    // 1000 -- INVALID
-	WallRot::L3,        // 1001
-	WallRot::UpDown,    // 1010
-	WallRot::T3,        // 1011
-	WallRot::L2,        // 1100
-	WallRot::T2,        // 1101
-	WallRot::T1,        // 1110
-	WallRot::Full,      // 1111
+pub const WALL_ROT_SEMANTICS:[[u8;2];WallRot::Count as usize] = [
+	[0, 0], // Blank [[ FALSE ; DON'T USE ]]
+	[4, 0], // Right
+	[4, 1], // Down
+	[2, 0], // L0
+	[4, 2], // Left
+	[1, 0], // LeftRight
+	[2, 1], // L1
+	[3, 0], // T0
+	[4, 3], // Up
+	[2, 3], // L3
+	[1, 1], // UpDown
+	[3, 3], // T3
+	[2, 2], // L2
+	[3, 2], // T2
+	[3, 1], // T1
+	[0, 0], // Full
 ];

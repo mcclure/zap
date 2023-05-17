@@ -136,12 +136,12 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 	let mut storage:Vec<u8> = Vec::default(); 
 
 	'grid: for (y,col) in walls.axis_iter(Axis(0)).enumerate() {
-		for (x,&tile_mask) in col.iter().enumerate() {
-			let tile_which = WALL_ROT_MASK[tile_mask as usize] as u32; // Notice y,x order
+		for (x,&tile_which) in col.iter().enumerate() {
+			let tile_which = tile_which as u32; // Notice y,x order
 			let sprite = [
 				mp(IVec2::new((x as u32*TILE_SIDE) as i32 + OFFSET, (y as u32*TILE_SIDE) as i32 + OFFSET)),
 				mp(TILE_SIZE),
-				mt(IVec2::new((tile_which*TILE_SIDE) as i32, TILE_Y_ORIGIN as i32)),
+				mt(IVec2::new(((tile_which%TILE_ROW_MAX)*TILE_SIDE) as i32, (TILE_Y_ORIGIN+(tile_which/TILE_ROW_MAX)*TILE_SIDE) as i32)),
 				mt(TILE_SIZE)
 			];
 
