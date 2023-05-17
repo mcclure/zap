@@ -112,7 +112,7 @@ pub fn load_sprite_atlas() -> GrayImage {
         }
     }
 
-    canvas.save("sprite_atlas_debug.png").unwrap(); // Debug
+    //canvas.save("sprite_atlas_debug.png").unwrap(); // Debug
 
     canvas
 }
