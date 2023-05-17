@@ -7,7 +7,7 @@ use crate::constants::*;
 //use std::mem;
 use glam::{IVec2, Vec2};
 use ndarray::{Array2, Axis};
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 
 fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
 	(
@@ -159,9 +159,19 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 		const ACTOR_SIZE:IVec2 = IVec2::new(ACTOR_SIDE as i32, ACTOR_SIDE as i32);
 
 		path_max.sort_by_key(|cand| {let (_, x) = cand.unwrap(); Reverse(x) });
-		'ord: for ord in 0..=1 {
+
+		while path_max[2].unwrap().0 == path_max[0].unwrap().0 || path_max[2].unwrap().0 == path_max[1].unwrap().0 {
+			path_max[2] = Some((IVec2::new(rng.gen_range(0..TILES) as i32, rng.gen_range(0..TILES) as i32), 0));
+		}
+
+		'ord: for ord in 0..=2 {
 			let (at, _) = path_max[ord].unwrap();
-			let actor_which = if ord==0 { 3 } else { 0 };
+			let actor_which = match ord { 0 => 3, 1 => 0, _ => {
+				let route = routes[to_index(at)];
+				     if 0==route&DirMask::Left as u8 && 0!=route&DirMask::Right as u8 { 5 }
+				else if 0!=route&DirMask::Left as u8 && 0==route&DirMask::Right as u8 { 4 }
+				else { rng.gen_range(4..=5) }
+			}};
 			let sprite = [
 				mp(IVec2::new(at.x*TILE_SIDE as i32 + OFFSET + 6, at.y*TILE_SIDE as i32 + OFFSET + 6)),
 				mp(ACTOR_SIZE),
