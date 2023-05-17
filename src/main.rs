@@ -99,7 +99,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         &queue,
         &instance_buffer,
         IVec2::new(CANVAS_SIDE as i32, CANVAS_SIDE as i32),
-        extent_xy_to_ivec(sprite_atlas.size())
+        extent_xy_to_ivec(sprite_atlas.size()),
+        true
     );
 
     // Load the shaders from disk

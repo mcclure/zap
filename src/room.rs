@@ -1,5 +1,7 @@
 // Data structure for a world map tile
 
+use std::cmp::Reverse;
+
 use crate::constants::*;
 
 //use std::mem;
@@ -29,7 +31,7 @@ fn _debug_room(routes: &Array2<u8>, origin:IVec2, player:IVec2, dir:usize) {
 	}
 }
 
-pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2) -> u64 {
+pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2, player_decorate:bool) -> u64 {
 	const TILES:u32 = CANVAS_SIDE/TILE_SIDE - 1;
 
 	// NDArray helpers
@@ -42,23 +44,39 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 	let routes_bound = IVec2::new(TILES as i32, TILES as i32);
 	let mut routes:Array2<u8> = Array2::default(to_index(routes_bound));
 	let mut rng = rand::thread_rng();
+	type ObjCand = (IVec2, u32);
+	let mut path_max: [Option<ObjCand>; 4] = [None, None, None, None];
 	{
 		// Must randomize indices rather than directions because rotation identity matters
 		const COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0) , IVec2::new(0,-1)];
 		const COMPASS_IDX:[usize;4] = [2,1,0,3];
 		
-		let mut stack = vec![(routes_bound/2, COMPASS_IDX, 0)];
+		let mut stack = vec![(routes_bound/2, COMPASS_IDX, 0, None::<usize>, 0)]; // See…
 		loop {
 			let top = stack.pop();
 			if top == None { break }
-			let (at, compass_order, compass_order_idx) = top.unwrap();
+			let (at, compass_order, compass_order_idx, root_branch, root_distance) = top.unwrap(); // …here
+			// (Note: root_s only needed for player_decorate case)
 
 			if compass_order_idx < 3 {
-				stack.push((at, compass_order, compass_order_idx+1));
+				stack.push((at, compass_order, compass_order_idx+1, root_branch, root_distance));
 			}
 
 			let compass_idx = compass_order[compass_order_idx];
 			let cand = at + COMPASS[compass_idx];
+
+			let root_branch = root_branch.unwrap_or(compass_idx);
+
+			if player_decorate { // We could do this one-fourth as often, but then we'd need special behavior for the case where the root is blocked on 3 sides
+				let current_path_max = path_max[root_branch];
+				let replace;
+				if let Some((_, distance)) = current_path_max {
+					replace = distance < root_distance;
+				} else { replace = true; }
+				if replace {
+					path_max[root_branch] = Some((at, root_distance));
+				}
+			}
 
 			if within(cand, routes_bound) {
 				let cand_value = routes[to_index(cand)];
@@ -66,7 +84,7 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 				if is_free {
 					let mut random_compass = COMPASS_IDX.clone();
 					random_compass.shuffle(&mut rng);
-					stack.push((cand, random_compass, 0));
+					stack.push((cand, random_compass, 0, Some(root_branch), root_distance+1));
 				}
 //println!("\nFrom {} check {}: {}, {}", at, cand, is_free, 0 != cand_value & 1<<((compass_idx+2)%4)); _debug_room(&routes, routes_bound/2, at, compass_idx);
 				if is_free || 0 != cand_value & 1<<((compass_idx+2)%4) {
@@ -130,6 +148,30 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 //			assert!(mem::size_of_val(&sprite) as u64 == SPRITE_SIZE);
 
 			if storage.len() as u64 + SPRITE_SIZE > buffer.size() as u64 { break 'grid }
+
+			let bytes = bytemuck::bytes_of(&sprite);
+
+			storage.extend_from_slice(bytes);
+		}
+	}
+
+	if player_decorate {
+		const ACTOR_SIZE:IVec2 = IVec2::new(ACTOR_SIDE as i32, ACTOR_SIDE as i32);
+
+		path_max.sort_by_key(|cand| {let (_, x) = cand.unwrap(); Reverse(x) });
+		'ord: for ord in 0..=1 {
+			let (at, _) = path_max[ord].unwrap();
+			let actor_which = if ord==0 { 3 } else { 0 };
+			let sprite = [
+				mp(IVec2::new(at.x*TILE_SIDE as i32 + OFFSET + 6, at.y*TILE_SIDE as i32 + OFFSET + 6)),
+				mp(ACTOR_SIZE),
+				mt(IVec2::new((actor_which*ACTOR_SIDE) as i32, ACTOR_Y_ORIGIN as i32)),
+				mt(ACTOR_SIZE)
+			];
+
+//			assert!(mem::size_of_val(&sprite) as u64 == SPRITE_SIZE);
+
+			if storage.len() as u64 + SPRITE_SIZE > buffer.size() as u64 { break 'ord }
 
 			let bytes = bytemuck::bytes_of(&sprite);
 
