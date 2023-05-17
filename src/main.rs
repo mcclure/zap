@@ -7,7 +7,7 @@ mod texture;
 
 use std::borrow::Cow;
 use winit::{
-    event::{Event, WindowEvent, ElementState, KeyboardInput},
+    event::{Event, WindowEvent, ElementState, KeyboardInput, DeviceEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
@@ -278,6 +278,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::KeyboardInput {input: KeyboardInput{state: ElementState::Pressed, ..}, ..},
                 ..
             } =>  {
+                instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
+                window.request_redraw()
+            },
+            Event::DeviceEvent {
+                event: DeviceEvent::Button {state: ElementState::Pressed, ..},
+                ..
+            } => {
                 instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
                 window.request_redraw()
             },
