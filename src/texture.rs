@@ -41,7 +41,7 @@ pub fn make_texture(device: &wgpu::Device, queue: &wgpu::Queue, img:GrayImage, l
     (texture, view)
 }
 
-pub fn make_sampler(device: &wgpu::Device) -> wgpu::Sampler { // Expected only called once
+pub fn _make_sampler(device: &wgpu::Device) -> wgpu::Sampler { // Currently unused
     device.create_sampler(&wgpu::SamplerDescriptor::default())
 }
 

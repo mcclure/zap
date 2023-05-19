@@ -296,8 +296,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
 fn main() {
     let event_loop = EventLoop::new();
-    let window = winit::window::Window::new(&event_loop).unwrap();
-    #[cfg(not(target_arch = "wasm32"))]
+    let window = winit::window::WindowBuilder::new()
+        .with_min_inner_size(winit::dpi::LogicalSize::new(128.0, 128.0))
+        .build(&event_loop).unwrap();    #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
         pollster::block_on(run(event_loop, window));
