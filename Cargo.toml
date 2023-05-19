@@ -39,7 +39,7 @@ panic = 'abort'     # Abort on panic
 strip = true        # Strip symbols from binary
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 path = "src/main.rs"
 
 # To build for Twiggy space profiler, uncomment these and run wasm-pack with --dev instead of --target web
