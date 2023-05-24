@@ -98,3 +98,7 @@ pub enum Actor {
 	Monster(Dir, u8) // Direction, sprite
 }
 
+// Helpers
+
+pub fn ivec_to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
+

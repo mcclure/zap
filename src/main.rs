@@ -36,13 +36,14 @@ impl Default for GameState {
 }
 
 fn game_move(state:&GameState, room:&mut Room, dir:Dir) {
-    if let (Actor::Player(mut player_dir), mut player_at) = room.actors[state.player_idx] {
-        if dir == player_dir {
-            player_at = player_at + DIR_COMPASS[dir as usize];
+    if let (Actor::Player(player_dir), player_at) = &mut room.actors[state.player_idx] {
+        if dir == *player_dir {
+            if 0 != room.routes[ivec_to_index(*player_at)] & (1 << *player_dir as u8) {
+                *player_at = *player_at + DIR_COMPASS[dir as usize];
+            }
         } else {
-            player_dir = dir;
+            *player_dir = dir;
         }
-        room.actors[state.player_idx] = (Actor::Player(player_dir), player_at);
     } else {
         panic!("Player not found where expected");
     }

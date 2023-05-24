@@ -41,14 +41,13 @@ const TILES:u32 = CANVAS_SIDE/TILE_SIDE - 1;
 
 pub fn room_make(add_actors:bool) -> Room {
 	// NDArray helpers
-	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
 	fn within (at:IVec2, size:IVec2) -> bool {
 		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
 	}
 
 	// Make map
 	let routes_bound = IVec2::new(TILES as i32, TILES as i32);
-	let mut routes:Array2<u8> = Array2::default(to_index(routes_bound));
+	let mut routes:Array2<u8> = Array2::default(ivec_to_index(routes_bound));
 	let mut actors:Vec<(Actor, IVec2)> = Default::default();
 	let mut rng = rand::thread_rng();
 	type ObjCand = (IVec2, u32);
@@ -85,7 +84,7 @@ pub fn room_make(add_actors:bool) -> Room {
 			}
 
 			if within(cand, routes_bound) {
-				let cand_value = routes[to_index(cand)];
+				let cand_value = routes[ivec_to_index(cand)];
 				let is_free = cand_value == 0;
 				if is_free {
 					let mut random_compass = COMPASS_IDX.clone();
@@ -94,14 +93,14 @@ pub fn room_make(add_actors:bool) -> Room {
 				}
 //println!("\nFrom {} check {}: {}, {}", at, cand, is_free, 0 != cand_value & 1<<((compass_idx+2)%4)); _debug_room(&routes, routes_bound/2, at, compass_idx);
 				if is_free || 0 != cand_value & 1<<((compass_idx+2)%4) {
-					routes[to_index(at)] |= 1<<compass_idx; // Reciprocate
+					routes[ivec_to_index(at)] |= 1<<compass_idx; // Reciprocate
 				}
 			}
 		}
 	}
 
 	let walls_bound = routes_bound + IVec2::ONE;
-	let mut walls:Array2<u8> = Array2::default(to_index(walls_bound));
+	let mut walls:Array2<u8> = Array2::default(ivec_to_index(walls_bound));
 	// Instead of iterating over the members of the array imagine the grid separating members of the array,
 	// and imagine iterating over the intersection points.
 	for y in 0..(TILES+1) {
@@ -110,9 +109,9 @@ pub fn room_make(add_actors:bool) -> Room {
 			let up_left = IVec2::new(x as i32-1,y as i32-1);
 			let down_left = IVec2::new(x as i32-1,y as i32);
 
-			if !within(up_left, routes_bound) || 0==routes[to_index(up_left)]&DirMask::Right as u8
+			if !within(up_left, routes_bound) || 0==routes[ivec_to_index(up_left)]&DirMask::Right as u8
 				{ walls[at] |= DirMask::Up as u8 }
-			if !within(down_left, routes_bound) || 0==routes[to_index(down_left)]&DirMask::Right as u8
+			if !within(down_left, routes_bound) || 0==routes[ivec_to_index(down_left)]&DirMask::Right as u8
 				{ walls[at] |= DirMask::Down as u8 }
 		}
 	}
@@ -122,9 +121,9 @@ pub fn room_make(add_actors:bool) -> Room {
 			let up_left = IVec2::new(x as i32-1,y as i32-1);
 			let up_right = IVec2::new(x as i32,y as i32-1);
 
-			if !within(up_left, routes_bound) || 0==routes[to_index(up_left)]&DirMask::Down as u8
+			if !within(up_left, routes_bound) || 0==routes[ivec_to_index(up_left)]&DirMask::Down as u8
 				{ walls[at] |= DirMask::Left as u8 }
-			if !within(up_right, routes_bound) || 0==routes[to_index(up_right)]&DirMask::Down as u8
+			if !within(up_right, routes_bound) || 0==routes[ivec_to_index(up_right)]&DirMask::Down as u8
 				{ walls[at] |= DirMask::Right as u8 }
 		}
 	}
@@ -139,7 +138,7 @@ pub fn room_make(add_actors:bool) -> Room {
 		for ord in 0..=2 {
 			let (at, _) = path_max[ord].unwrap();
 			let actor = match ord { 0 => Actor::Door, 1 => Actor::Player(if rng.gen_range(0..=1) == 0 {Dir::Left} else {Dir::Right}), _ => Actor::Key({
-				let route = routes[to_index(at)];
+				let route = routes[ivec_to_index(at)];
 				     if 0==route&DirMask::Left as u8 && 0!=route&DirMask::Right as u8 { false }
 				else if 0!=route&DirMask::Left as u8 && 0==route&DirMask::Right as u8 { true }
 				else { rng.gen_range(0..=1) != 0 }
