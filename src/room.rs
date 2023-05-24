@@ -9,6 +9,12 @@ use glam::{IVec2, Vec2};
 use ndarray::{Array2, Axis};
 use rand::{seq::SliceRandom, Rng};
 
+pub struct Room {
+	pub routes:Array2<u8>,
+	pub walls:Array2<u8>,
+	pub actors:Vec<(Actor, IVec2)> // Data, location
+}
+
 fn make_float(v:IVec2, scale:Vec2) -> [f32;2] {
 	(
 		Vec2::new(v.x as f32, v.y as f32)
@@ -31,9 +37,9 @@ fn _debug_room(routes: &Array2<u8>, origin:IVec2, player:IVec2, dir:usize) {
 	}
 }
 
-pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2, player_decorate:bool) -> u64 {
-	const TILES:u32 = CANVAS_SIDE/TILE_SIDE - 1;
+const TILES:u32 = CANVAS_SIDE/TILE_SIDE - 1;
 
+pub fn room_make(add_actors:bool) -> Room {
 	// NDArray helpers
 	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
 	fn within (at:IVec2, size:IVec2) -> bool {
@@ -43,12 +49,12 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 	// Make map
 	let routes_bound = IVec2::new(TILES as i32, TILES as i32);
 	let mut routes:Array2<u8> = Array2::default(to_index(routes_bound));
+	let mut actors:Vec<(Actor, IVec2)> = Default::default();
 	let mut rng = rand::thread_rng();
 	type ObjCand = (IVec2, u32);
 	let mut path_max: [Option<ObjCand>; 4] = [None, None, None, None];
 	{
 		// Must randomize indices rather than directions because rotation identity matters
-		const COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0) , IVec2::new(0,-1)];
 		const COMPASS_IDX:[usize;4] = [2,1,0,3];
 		
 		let mut stack = vec![(routes_bound/2, COMPASS_IDX, 0, None::<usize>, 0)]; // See…
@@ -63,11 +69,11 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 			}
 
 			let compass_idx = compass_order[compass_order_idx];
-			let cand = at + COMPASS[compass_idx];
+			let cand = at + DIR_COMPASS[compass_idx];
 
 			let root_branch = root_branch.unwrap_or(compass_idx);
 
-			if player_decorate { // We could do this one-fourth as often, but then we'd need special behavior for the case where the root is blocked on 3 sides
+			if add_actors { // We could do this one-fourth as often, but then we'd need special behavior for the case where the root is blocked on 3 sides
 				let current_path_max = path_max[root_branch];
 				let replace;
 				if let Some((_, distance)) = current_path_max {
@@ -123,26 +129,51 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 		}
 	}
 
+	if add_actors {
+		path_max.sort_by_key(|cand| {let (_, x) = cand.unwrap(); Reverse(x) });
+
+		while path_max[2].unwrap().0 == path_max[0].unwrap().0 || path_max[2].unwrap().0 == path_max[1].unwrap().0 {
+			path_max[2] = Some((IVec2::new(rng.gen_range(0..TILES) as i32, rng.gen_range(0..TILES) as i32), 0));
+		}
+
+		for ord in 0..=2 {
+			let (at, _) = path_max[ord].unwrap();
+			let actor = match ord { 0 => Actor::Door, 1 => Actor::Player(if rng.gen_range(0..=1) == 0 {Dir::Left} else {Dir::Right}), _ => Actor::Key({
+				let route = routes[to_index(at)];
+				     if 0==route&DirMask::Left as u8 && 0!=route&DirMask::Right as u8 { false }
+				else if 0!=route&DirMask::Left as u8 && 0==route&DirMask::Right as u8 { true }
+				else { rng.gen_range(0..=1) != 0 }
+			})};
+
+			actors.push((actor, at));
+		}
+	}
+
+	Room { routes, walls, actors }
+}
+
+pub fn room_render(room: &Room, queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_scale:IVec2, tex_scale:IVec2, actor_draw:bool) -> u64 {
 	// Notice y,x order
 	const OFFSET:i32 = (CANVAS_SIDE as i32 - TILE_SIDE as i32*(TILES as i32 + 1))/2;
 	const TILE_SIZE:IVec2 = IVec2::new(TILE_SIDE as i32, TILE_SIDE as i32);
 
 	let (pos_scale, tex_scale) = (pos_scale.as_vec2(), tex_scale.as_vec2());
+	let tex_scale_reflect = Vec2::new(-tex_scale.x, tex_scale.y);
 
 	// Make position, make tile
 	let mp = |v:IVec2| { make_float(v, pos_scale) };
-	let mt = |v:IVec2| { make_float(v, tex_scale) };
+	let mt = |v:IVec2, reflect:bool| { make_float(v, if reflect { tex_scale_reflect } else { tex_scale }) };
 
 	let mut storage:Vec<u8> = Vec::default(); 
 
-	'grid: for (y,col) in walls.axis_iter(Axis(0)).enumerate() {
+	'grid: for (y,col) in room.walls.axis_iter(Axis(0)).enumerate() {
 		for (x,&tile_which) in col.iter().enumerate() {
 			let tile_which = tile_which as u32; // Notice y,x order
 			let sprite = [
 				mp(IVec2::new((x as u32*TILE_SIDE) as i32 + OFFSET, (y as u32*TILE_SIDE) as i32 + OFFSET)),
 				mp(TILE_SIZE),
-				mt(IVec2::new(((tile_which%TILE_ROW_MAX)*TILE_SIDE) as i32, (TILE_Y_ORIGIN+(tile_which/TILE_ROW_MAX)*TILE_SIDE) as i32)),
-				mt(TILE_SIZE)
+				mt(IVec2::new(((tile_which%TILE_ROW_MAX)*TILE_SIDE) as i32, (TILE_Y_ORIGIN+(tile_which/TILE_ROW_MAX)*TILE_SIDE) as i32), false),
+				mt(TILE_SIZE, false)
 			];
 
 //			assert!(mem::size_of_val(&sprite) as u64 == SPRITE_SIZE);
@@ -155,33 +186,33 @@ pub fn room_push_fill_random(queue: &wgpu::Queue, buffer: &wgpu::Buffer, pos_sca
 		}
 	}
 
-	if player_decorate {
+	if actor_draw {
 		const ACTOR_SIZE:IVec2 = IVec2::new(ACTOR_SIDE as i32, ACTOR_SIDE as i32);
 
-		path_max.sort_by_key(|cand| {let (_, x) = cand.unwrap(); Reverse(x) });
-
-		while path_max[2].unwrap().0 == path_max[0].unwrap().0 || path_max[2].unwrap().0 == path_max[1].unwrap().0 {
-			path_max[2] = Some((IVec2::new(rng.gen_range(0..TILES) as i32, rng.gen_range(0..TILES) as i32), 0));
-		}
-
-		'ord: for ord in 0..=2 {
-			let (at, _) = path_max[ord].unwrap();
-			let actor_which = match ord { 0 => 3, 1 => 0, _ => {
-				let route = routes[to_index(at)];
-				     if 0==route&DirMask::Left as u8 && 0!=route&DirMask::Right as u8 { 5 }
-				else if 0!=route&DirMask::Left as u8 && 0==route&DirMask::Right as u8 { 4 }
-				else { rng.gen_range(4..=5) }
-			}};
+		'sprite: for actor in &room.actors {
+			let (actor, at) = actor;
+			let (actor_which, reflect) = match actor {
+				Actor::Player(Dir::Right) => (0, false),
+				Actor::Player(Dir::Left) => (0, true),
+				Actor::Player(Dir::Down) => (1, false),
+				Actor::Player(Dir::Up) => (2, false),
+				Actor::Door => (3, false),
+				Actor::Key(true) => (4, false),
+				Actor::Key(false) => (5, false),
+				Actor::Shot => (6, false),
+				Actor::Ammo => (7, false),
+				Actor::Monster(_, n) => (8+*n as u32, false), // FIXME: Must assert MONSTER_Y_ORIGIN == 0, MONSTER_X_ORIGIN == 8*8
+			};
 			let sprite = [
 				mp(IVec2::new(at.x*TILE_SIDE as i32 + OFFSET + 6, at.y*TILE_SIDE as i32 + OFFSET + 6)),
 				mp(ACTOR_SIZE),
-				mt(IVec2::new((actor_which*ACTOR_SIDE) as i32, ACTOR_Y_ORIGIN as i32)),
-				mt(ACTOR_SIZE)
+				mt(IVec2::new(((actor_which + if reflect { 1 } else { 0 })*ACTOR_SIDE) as i32, ACTOR_Y_ORIGIN as i32), false),
+				mt(ACTOR_SIZE, reflect)
 			];
 
 //			assert!(mem::size_of_val(&sprite) as u64 == SPRITE_SIZE);
 
-			if storage.len() as u64 + SPRITE_SIZE > buffer.size() as u64 { break 'ord }
+			if storage.len() as u64 + SPRITE_SIZE > buffer.size() as u64 { break 'sprite }
 
 			let bytes = bytemuck::bytes_of(&sprite);
 

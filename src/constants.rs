@@ -2,6 +2,7 @@
 
 use std::mem;
 use int_enum::IntEnum;
+use glam::IVec2;
 
 // Graphics
 
@@ -29,6 +30,8 @@ pub enum Dir {
 	Left = 2,
 	Up = 3
 }
+
+pub const DIR_COMPASS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0) , IVec2::new(0,-1)];
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum)]
@@ -82,3 +85,16 @@ pub const WALL_ROT_SEMANTICS:[[u8;2];WallRot::Count as usize] = [
 	[3, 1], // T1
 	[0, 0], // Full
 ];
+
+// Actors
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Actor {
+	Player(Dir),
+	Door,
+	Key(bool), // True for rightward
+	Ammo,
+	Shot,
+	Monster(Dir, u8) // Direction, sprite
+}
+

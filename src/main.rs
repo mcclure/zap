@@ -7,7 +7,7 @@ mod texture;
 
 use std::borrow::Cow;
 use winit::{
-    event::{Event, WindowEvent, ElementState, KeyboardInput, DeviceEvent},
+    event::{Event, DeviceEvent, WindowEvent, ElementState, KeyboardInput, VirtualKeyCode},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
@@ -26,6 +26,27 @@ use crate::texture::*;
 const FORCE_MULTIPLE: Option<i32> = Some(128);
 
 const CLEAR_COLOR: wgpu::Color = wgpu::Color { r:250./255., g:236./255., b:209./255., a:1. };
+
+struct GameState {
+    player_idx: usize,
+    keys: u32,
+}
+impl Default for GameState {
+    fn default() -> Self { Self { player_idx:0, keys:0 } }
+}
+
+fn game_move(state:&GameState, room:&mut Room, dir:Dir) {
+    if let (Actor::Player(mut player_dir), mut player_at) = room.actors[state.player_idx] {
+        if dir == player_dir {
+            player_at = player_at + DIR_COMPASS[dir as usize];
+        } else {
+            player_dir = dir;
+        }
+        room.actors[state.player_idx] = (Actor::Player(player_dir), player_at);
+    } else {
+        panic!("Player not found where expected");
+    }
+}
 
 // Silently fails if texture is bigger than 2^31 on either axis. Whatever
 fn extent_xy_to_ivec(v:wgpu::Extent3d) -> IVec2 {
@@ -96,8 +117,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // Write scene
     let mut instance_buffer_count;
-    fn reset_instance_buffer(queue:&wgpu::Queue, instance_buffer:&wgpu::Buffer, sprite_atlas:&wgpu::Texture) -> u64 {
-        return room_push_fill_random(
+    let mut room;
+    let mut state = GameState::default();
+    fn reset_game() -> (Room, usize) {
+        let room = room_make(true);
+
+        // Find player
+        let mut player_idx = None::<usize>;
+        for (idx, (actor, _)) in room.actors.iter().enumerate() {
+            if let Actor::Player(_) = actor {
+                player_idx = Some(idx);
+            }
+        }
+        let player_idx = player_idx.unwrap();
+
+        (room, player_idx)
+    }
+
+    fn update_instance_buffer(room: &Room, queue:&wgpu::Queue, instance_buffer:&wgpu::Buffer, sprite_atlas:&wgpu::Texture) -> u64 {
+        return room_render(
+            room,
             queue,
             instance_buffer,
             IVec2::new(CANVAS_SIDE as i32, CANVAS_SIDE as i32),
@@ -105,7 +144,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             true
        );
     }
-    instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
+    (room, state.player_idx) = reset_game();
+    instance_buffer_count = update_instance_buffer(&room, &queue, &instance_buffer, &sprite_atlas);
 
     // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -275,17 +315,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             } => *control_flow = ControlFlow::Exit,
             // Recomment when a more sensible frame approach in place, but then uncomment again for RenderDoc.
             Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {input: KeyboardInput{state: ElementState::Pressed, ..}, ..},
+                event: WindowEvent::KeyboardInput {input:
+                    KeyboardInput{state: ElementState::Pressed, virtual_keycode:Some(key), ..}, ..},
                 ..
             } =>  {
-                instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
-                window.request_redraw()
+                if match key { // return true for redraw
+                    VirtualKeyCode::Escape | VirtualKeyCode::Delete | VirtualKeyCode::Back => {
+                        state = Default::default();
+                        (room, state.player_idx) = reset_game();
+                        true
+                    },
+                    VirtualKeyCode::Right => { game_move(&state, &mut room, Dir::Right); true },
+                    VirtualKeyCode::Down => { game_move(&state, &mut room, Dir::Down); true },
+                    VirtualKeyCode::Left => { game_move(&state, &mut room, Dir::Left); true },
+                    VirtualKeyCode::Up => { game_move(&state, &mut room, Dir::Up); true },
+                    _ => false
+                } {
+                    instance_buffer_count = update_instance_buffer(&room, &queue, &instance_buffer, &sprite_atlas);
+                    window.request_redraw()
+                }
             },
             Event::DeviceEvent {
                 event: DeviceEvent::Button {state: ElementState::Pressed, ..},
                 ..
             } => {
-                instance_buffer_count = reset_instance_buffer(&queue, &instance_buffer, &sprite_atlas);
+                instance_buffer_count = update_instance_buffer(&room, &queue, &instance_buffer, &sprite_atlas);
                 window.request_redraw()
             },
             _ => {}
