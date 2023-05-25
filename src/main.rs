@@ -1,6 +1,7 @@
 // Entry point
 
 mod constants;
+mod game;
 mod quad;
 mod room;
 mod texture;
@@ -19,6 +20,7 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::WindowExtWebSys;
 
 use crate::constants::*;
+use crate::game::*;
 use crate::quad::*;
 use crate::room::*;
 use crate::texture::*;
@@ -26,28 +28,6 @@ use crate::texture::*;
 const FORCE_MULTIPLE: Option<i32> = Some(128);
 
 const CLEAR_COLOR: wgpu::Color = wgpu::Color { r:250./255., g:236./255., b:209./255., a:1. };
-
-struct GameState {
-    player_idx: usize,
-    keys: u32,
-}
-impl Default for GameState {
-    fn default() -> Self { Self { player_idx:0, keys:0 } }
-}
-
-fn game_move(state:&GameState, room:&mut Room, dir:Dir) {
-    if let (Actor::Player(player_dir), player_at) = &mut room.actors[state.player_idx] {
-        if dir == *player_dir {
-            if 0 != room.routes[ivec_to_index(*player_at)] & (1 << *player_dir as u8) {
-                *player_at = *player_at + DIR_COMPASS[dir as usize];
-            }
-        } else {
-            *player_dir = dir;
-        }
-    } else {
-        panic!("Player not found where expected");
-    }
-}
 
 // Silently fails if texture is bigger than 2^31 on either axis. Whatever
 fn extent_xy_to_ivec(v:wgpu::Extent3d) -> IVec2 {
@@ -326,10 +306,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         (room, state.player_idx) = reset_game();
                         true
                     },
-                    VirtualKeyCode::Right => { game_move(&state, &mut room, Dir::Right); true },
-                    VirtualKeyCode::Down => { game_move(&state, &mut room, Dir::Down); true },
-                    VirtualKeyCode::Left => { game_move(&state, &mut room, Dir::Left); true },
-                    VirtualKeyCode::Up => { game_move(&state, &mut room, Dir::Up); true },
+                    VirtualKeyCode::Right => { game_move(&mut state, &mut room, Dir::Right); true },
+                    VirtualKeyCode::Down => { game_move(&mut state, &mut room, Dir::Down); true },
+                    VirtualKeyCode::Left => { game_move(&mut state, &mut room, Dir::Left); true },
+                    VirtualKeyCode::Up => { game_move(&mut state, &mut room, Dir::Up); true },
                     _ => false
                 } {
                     instance_buffer_count = update_instance_buffer(&room, &queue, &instance_buffer, &sprite_atlas);
