@@ -15,6 +15,7 @@ pub const MONSTER_Y_ORIGIN:u32 = 0;
 pub const MONSTER_COUNT:u32 = 8;
 pub const TILE_Y_ORIGIN:u32 = 8;
 
+pub const LARGEST_PNG_SIDE:u32 = TILE_SIDE;
 pub const CANVAS_SIDE:u32 = 128;
 
 pub const SPRITE_SIZE:u64 = 8*mem::size_of::<f32>() as u64;

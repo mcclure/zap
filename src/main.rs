@@ -90,7 +90,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .expect("Failed to create device");
 
     // Build scene
-    let (sprite_atlas, sprite_atlas_view) = make_texture(&device, &queue, load_sprite_atlas(), "sprite");
+    let (sprite_atlas, sprite_atlas_view) = make_texture(&device, &queue, load_sprite_atlas().await, "sprite");
 
     let (root_vertex_buffer, root_index_buffer, root_vertex_layout) = make_quad_root_buffer(&device);
 
@@ -333,7 +333,8 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_min_inner_size(winit::dpi::LogicalSize::new(128.0, 128.0))
-        .build(&event_loop).unwrap();    #[cfg(not(target_arch = "wasm32"))]
+        .build(&event_loop).unwrap();
+    #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
         pollster::block_on(run(event_loop, window));

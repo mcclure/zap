@@ -16,6 +16,59 @@ const STANDARD_TEXTURE_DESCRIPTOR:wgpu::TextureDescriptor = wgpu::TextureDescrip
     view_formats: &[],
 };
 
+struct FlexDecoder {
+//    #[cfg(target_arch = "wasm32")]
+}
+
+impl FlexDecoder {
+    pub fn new(_width:u32, _height:u32) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            FlexDecoder {}
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            FlexDecoder {}
+        } 
+    }
+
+    pub async fn load_from_memory(&self, buffer: &[u8]) -> image::ImageResult<image::DynamicImage> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            image::load_from_memory(buffer)
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::JsCast;
+
+            // Setup
+            let window = web_sys::window().expect("no global `window` exists");
+            let document = window.document().expect("should have a document on window");
+            let body = document.body().expect("document should have a body");
+
+            // Make object
+            let bytes = js_sys::Array::new();
+            bytes.push(&js_sys::Uint8Array::from(buffer));
+
+            let blob = web_sys::Blob::new_with_u8_array_sequence(&bytes).unwrap();
+
+            let bitmap:web_sys::ImageBitmap =
+                wasm_bindgen_futures::JsFuture::from(
+                    window.create_image_bitmap_with_blob(&blob).unwrap()
+                ).await.unwrap().dyn_into().unwrap();
+
+            let (width, height) = (bitmap.width(), bitmap.height());
+            let canvas = web_sys::OffscreenCanvas::new(width, height).unwrap();
+            let context:web_sys::OffscreenCanvasRenderingContext2d = canvas.get_context("2d").unwrap().unwrap().dyn_into().unwrap();
+
+            context.draw_image_with_image_bitmap(&bitmap, 0., 0.);
+            let data = context.get_image_data(0., 0., width as f64, height as f64).unwrap().data().0;
+
+            Ok(image::DynamicImage::ImageRgba8(image::ImageBuffer::from_raw(width, height, data).unwrap()))
+        }
+    }
+}
+
 pub fn make_texture(device: &wgpu::Device, queue: &wgpu::Queue, img:GrayImage, label:&str) -> (wgpu::Texture, wgpu::TextureView) {
     let size = wgpu::Extent3d {width:img.width(), height:img.height(), ..STANDARD_TEXTURE_DESCRIPTOR.size};
     let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -45,7 +98,9 @@ pub fn _make_sampler(device: &wgpu::Device) -> wgpu::Sampler { // Currently unus
     device.create_sampler(&wgpu::SamplerDescriptor::default())
 }
 
-pub fn load_sprite_atlas() -> GrayImage {
+pub async fn load_sprite_atlas() -> GrayImage {
+    let mut decoder = FlexDecoder::new(ACTOR_SIDE, ACTOR_SIDE);
+
     seq_macro::seq! { N in 0..8 {
         const ACTOR: [&[u8]; 8] = [
             #(
@@ -62,7 +117,7 @@ pub fn load_sprite_atlas() -> GrayImage {
 
         let tile_img:[GrayImage;5] = [
             #(
-                image::load_from_memory(TILE[N]).unwrap().to_luma8(),
+                decoder.load_from_memory(TILE[N]).await.unwrap().to_luma8(),
             )*
         ];
     }};
@@ -70,7 +125,7 @@ pub fn load_sprite_atlas() -> GrayImage {
     let mut canvas = ImageBuffer::from_pixel(128, 32, Luma([0xFFu8])); //GrayImage::new(64, 32);
 
     for idx in 0..8 {
-        let img = image::load_from_memory(ACTOR[idx]).unwrap().to_luma8();
+        let img = decoder.load_from_memory(ACTOR[idx]).await.unwrap().to_luma8();
         canvas.copy_from(&img, (idx as u32)*ACTOR_SIDE, ACTOR_Y_ORIGIN).unwrap();
     }
 
