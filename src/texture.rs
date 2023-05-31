@@ -16,13 +16,15 @@ const STANDARD_TEXTURE_DESCRIPTOR:wgpu::TextureDescriptor = wgpu::TextureDescrip
     view_formats: &[],
 };
 
+// FIXME: Return error
+// FIXME: Option<tuple> is slightly space heavier than Option<context>
 struct FlexDecoder {
     #[cfg(target_arch = "wasm32")]
-    canvas: Option<web_sys::OffscreenCanvas>
+    canvas: Option<(web_sys::OffscreenCanvasRenderingContext2d, width, height)>
 }
 
 impl FlexDecoder {
-    pub fn new() -> Self { // Width, height
+    pub fn new() -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         {
             FlexDecoder {}
@@ -42,14 +44,19 @@ impl FlexDecoder {
     pub fn try_reserve(&mut self, _width:u32, _height:u32) -> Result<(), ()> {
         #[cfg(target_arch = "wasm32")]
         {
-            let reset = if let Some(canvas) = self.canvas.as_ref() {
-                let width = canvas.width();
-                let height = canvas.height();
-
+            let reset = if let Some((_, width, height)) = self.canvas.as_ref() {
                 _width > width || _height > height
             } else { true };
             if reset {
-                self.canvas = Some(web_sys::OffscreenCanvas::new(_width, _height).unwrap())
+                let canvas = web_sys::OffscreenCanvas::new(_width, _height).unwrap();
+                let mut attributes = web_sys::ContextAttributes2d::new();
+                attributes.will_read_frequently(true);
+
+                let context:web_sys::OffscreenCanvasRenderingContext2d =
+                    canvas.get_context_with_context_options("2d", &attributes)
+                        .unwrap().unwrap().dyn_into().unwrap();
+
+                self.canvas = Some((context, width, height))
             }
         }
         Ok(())
@@ -82,12 +89,7 @@ impl FlexDecoder {
 
             let (width, height) = (bitmap.width(), bitmap.height());
             self.try_reserve(width, height).unwrap();
-            let canvas = self.canvas.as_ref().unwrap(); // Unless try_reserve fails, we have Some
-            let mut attributes = web_sys::ContextAttributes2d::new();
-            attributes.will_read_frequently(true);
-            let context:web_sys::OffscreenCanvasRenderingContext2d =
-                canvas.get_context_with_context_options("2d", &attributes)
-                    .unwrap().unwrap().dyn_into().unwrap();
+            let (context, _, _) = self.canvas.as_ref().unwrap(); // Unless try_reserve fails, we have Some
 
             context.draw_image_with_image_bitmap(&bitmap, 0., 0.);
             let data = context.get_image_data(0., 0., width as f64, height as f64).unwrap().data().0;
