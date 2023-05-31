@@ -17,22 +17,45 @@ const STANDARD_TEXTURE_DESCRIPTOR:wgpu::TextureDescriptor = wgpu::TextureDescrip
 };
 
 struct FlexDecoder {
-//    #[cfg(target_arch = "wasm32")]
+    #[cfg(target_arch = "wasm32")]
+    canvas: Option<web_sys::OffscreenCanvas>
 }
 
 impl FlexDecoder {
-    pub fn new(_width:u32, _height:u32) -> Self {
+    pub fn new() -> Self { // Width, height
         #[cfg(not(target_arch = "wasm32"))]
         {
             FlexDecoder {}
         }
         #[cfg(target_arch = "wasm32")]
         {
-            FlexDecoder {}
+            FlexDecoder {canvas: None}
         } 
     }
 
-    pub async fn load_from_memory(&self, buffer: &[u8]) -> image::ImageResult<image::DynamicImage> {
+    pub fn with_capacity(width:u32, height:u32) -> Self {
+        let mut it = Self::new();
+        it.try_reserve(width, height).unwrap();
+        it
+    }
+
+    pub fn try_reserve(&mut self, _width:u32, _height:u32) -> Result<(), ()> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let reset = if let Some(canvas) = self.canvas.as_ref() {
+                let width = canvas.width();
+                let height = canvas.height();
+
+                _width > width || _height > height
+            } else { true };
+            if reset {
+                self.canvas = Some(web_sys::OffscreenCanvas::new(_width, _height).unwrap())
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn load_from_memory(&mut self, buffer: &[u8]) -> image::ImageResult<image::DynamicImage> {
         #[cfg(not(target_arch = "wasm32"))]
         {
             image::load_from_memory(buffer)
@@ -58,8 +81,13 @@ impl FlexDecoder {
                 ).await.unwrap().dyn_into().unwrap();
 
             let (width, height) = (bitmap.width(), bitmap.height());
-            let canvas = web_sys::OffscreenCanvas::new(width, height).unwrap();
-            let context:web_sys::OffscreenCanvasRenderingContext2d = canvas.get_context("2d").unwrap().unwrap().dyn_into().unwrap();
+            self.try_reserve(width, height).unwrap();
+            let canvas = self.canvas.as_ref().unwrap(); // Unless try_reserve fails, we have Some
+            let mut attributes = web_sys::ContextAttributes2d::new();
+            attributes.will_read_frequently(true);
+            let context:web_sys::OffscreenCanvasRenderingContext2d =
+                canvas.get_context_with_context_options("2d", &attributes)
+                    .unwrap().unwrap().dyn_into().unwrap();
 
             context.draw_image_with_image_bitmap(&bitmap, 0., 0.);
             let data = context.get_image_data(0., 0., width as f64, height as f64).unwrap().data().0;
@@ -99,7 +127,7 @@ pub fn _make_sampler(device: &wgpu::Device) -> wgpu::Sampler { // Currently unus
 }
 
 pub async fn load_sprite_atlas() -> GrayImage {
-    let mut decoder = FlexDecoder::new(ACTOR_SIDE, ACTOR_SIDE);
+    let mut decoder = FlexDecoder::with_capacity(LARGEST_PNG_SIDE, LARGEST_PNG_SIDE);
 
     seq_macro::seq! { N in 0..8 {
         const ACTOR: [&[u8]; 8] = [
